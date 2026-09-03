@@ -1,0 +1,83 @@
+name: Universal CMS CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Static checks (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, mbstring, fileinfo
+          coverage: none
+      - name: Syntax
+        run: find . -type f -name '*.php' -not -path './storage/*' -print0 | xargs -0 -n1 php -l
+      - name: Platform verify
+        run: php tools/verify.php
+      - name: Module generator dry-run
+        run: php tools/generate-module.php services "الخدمات" "Services" --dry-run
+      - name: Doctor without runtime config
+        run: php tools/doctor.php --static
+
+  mysql-runtime:
+    name: MariaDB runtime integration
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: universal_cms_ci
+          MARIADB_USER: cms_ci
+          MARIADB_PASSWORD: cms_ci_password
+          MARIADB_ROOT_PASSWORD: root_ci_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      CMS_APP_NAME: Universal CMS CI
+      CMS_BASE_URL: http://127.0.0.1:8090
+      CMS_DEFAULT_LOCALE: ar
+      CMS_LANGUAGES: ar,en
+      CMS_THEME_DEFAULT: system
+      CMS_APP_KEY: 89e332c06384d535e011d0b906d123f904a37a7592a06ed4bd8e75d00b224e2c
+      CMS_ALLOWED_ORIGINS: http://127.0.0.1:8090
+      CMS_DB_HOST: 127.0.0.1
+      CMS_DB_PORT: 3306
+      CMS_DB_NAME: universal_cms_ci
+      CMS_DB_USER: cms_ci
+      CMS_DB_PASS: cms_ci_password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, fileinfo
+          coverage: none
+      - name: Prepare writable runtime dirs
+        run: mkdir -p storage/backups uploads
+      - name: Full HTTP installer + login smoke
+        run: bash tests/integration/http-installer.sh
+      - name: Upgrade v0.3 -> v0.4
+        run: php tests/integration/upgrade-v0_3.php
+      - name: Database integration suite
+        run: php tests/integration/runtime.php
+      - name: Generator disposable integration
+        run: php tests/integration/generator.php
+      - name: Runtime doctor
+        run: php tools/doctor.php

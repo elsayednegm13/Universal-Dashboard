@@ -1,0 +1,48 @@
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${CMS_DB_NAME:-universal_cms}
+      MARIADB_USER: ${CMS_DB_USER:-universal_cms}
+      MARIADB_PASSWORD: ${CMS_DB_PASS:-change-this-password}
+      MARIADB_ROOT_PASSWORD: ${CMS_DB_ROOT_PASS:-change-root-password}
+    ports:
+      - "${CMS_DB_PORT_EXPOSED:-3307}:3306"
+    volumes:
+      - universal_cms_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CMS_APP_NAME: Universal CMS Dev
+      CMS_BASE_URL: http://localhost:${CMS_HTTP_PORT:-8080}
+      CMS_DEFAULT_LOCALE: ar
+      CMS_LANGUAGES: ar,en
+      CMS_THEME_DEFAULT: system
+      CMS_APP_KEY: 9d861329c225899395c3ec91cb62846b70a24ea242e78f6b2d6572d6caa10db7
+      CMS_ALLOWED_ORIGINS: http://localhost:${CMS_HTTP_PORT:-8080}
+      CMS_DB_HOST: db
+      CMS_DB_PORT: 3306
+      CMS_DB_NAME: ${CMS_DB_NAME:-universal_cms}
+      CMS_DB_USER: ${CMS_DB_USER:-universal_cms}
+      CMS_DB_PASS: ${CMS_DB_PASS:-change-this-password}
+    ports:
+      - "${CMS_HTTP_PORT:-8080}:80"
+    volumes:
+      - universal_cms_uploads:/var/www/html/uploads
+      - universal_cms_storage:/var/www/html/storage
+
+volumes:
+  universal_cms_db:
+  universal_cms_uploads:
+  universal_cms_storage:

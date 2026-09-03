@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 RC — U4 Release Engineering & Runtime Verification
+
+- Added Docker PHP 8.3 + Apache + MariaDB 11.4 development runtime.
+- Added GitHub Actions static matrix for PHP 8.2/8.3/8.4.
+- Added MariaDB integration CI for installer, login, API health, upgrade, backup/restore and module generation.
+- Added `tools/doctor.php` environment/runtime diagnostics.
+- Added `tools/release-check.php` release gate.
+- Added destructive-test safety guard requiring DB names containing `test` or `ci`.
+- Added real v0.3 → v0.4 migration fixture/test.
+- Added `cms_release_history` and U4 release migration.
+- Added DB-scoped advisory locking for migration execution.
+- Upgraded backup format to v3 with platform/schema/migration metadata and upload size/hash validation.
+- Added restore compatibility preflight while keeping v2 backup read compatibility.
+- Improved Backup Admin UI with backup validity/version/content summary.
+- Added release/security/contribution documentation and production checklist.
+
 ## 0.3.0 — U3 Module SDK & Versioned Migrations
 
 - Replaced hardcoded module registry with manifest discovery.

@@ -1,0 +1,11 @@
+.git
+.github
+storage/config.local.php
+storage/install.lock
+storage/backups/*
+!storage/backups/.gitkeep
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+*.zip
+coverage

@@ -4,7 +4,7 @@
 
 Universal CMS Admin هو مشروع Dashboard/CMS مستقل صُمم ليكون قاعدة جاهزة لأي موقع جديد بدل إعادة بناء لوحة الإدارة في كل مشروع. الفكرة الأساسية هي فصل **CMS Core** عن **Business Modules** وعن **Frontend**، بحيث يمكن تثبيت النظام مرة، تفعيل الوحدات المطلوبة، ثم ربط أي واجهة أمامية عبر API v1.
 
-> الإصدار الحالي: **v0.3.0 — U3 Module SDK & Versioned Migrations**
+> الإصدار الحالي: **v0.4.0 RC — U4 Release Engineering & Disposable Runtime Verification**
 
 ---
 
@@ -35,6 +35,7 @@ Universal CMS Admin هو مشروع Dashboard/CMS مستقل صُمم ليكون
 - [23. Troubleshooting](#23-troubleshooting)
 - [24. حدود النظام الحالية](#24-حدود-النظام-الحالية)
 - [25. ملفات التوثيق](#25-ملفات-التوثيق)
+- [26. U4: Docker / CI / Runtime Verification](#26-u4-docker--ci--runtime-verification)
 
 ---
 
@@ -1182,6 +1183,13 @@ U3_PLATFORM_REPORT.md           ما تم في U3
 U3_VERIFICATION.md              نتائج تحقق U3
 MIGRATION_FROM_V0_2.md          التحديث من v0.2 إلى v0.3
 CHANGELOG.md                    تاريخ الإصدارات
+MIGRATION_FROM_V0_3.md          التحديث من v0.3 إلى v0.4
+RELEASE_CHECKLIST.md            بوابة الإغلاق قبل Release/Production
+SECURITY.md                     سياسة الإبلاغ عن الثغرات
+CONTRIBUTING.md                 قواعد المساهمة
+docs/DOCKER.md                  تشغيل Docker
+docs/RUNTIME_TESTING.md         Runtime/Clone test suite
+docs/RELEASES.md                Release engineering
 ```
 
 ---
@@ -1189,20 +1197,25 @@ CHANGELOG.md                    تاريخ الإصدارات
 ## Version
 
 ```text
-Universal CMS Admin v0.3.0
+Universal CMS Admin v0.4.0 RC
 ```
 
-### U3 Summary
+### U4 Summary
 
 ```text
 Dynamic Module Manifests        ✅
 Auto Module Discovery           ✅
 Module SDK / Generator          ✅
 Versioned Migrations            ✅
-Migration Checksums             ✅
+Migration Checksums + Locking   ✅
 Migration Status                ✅
 Dependency Foundation           ✅
 Dynamic Module Backup Tables    ✅
+Backup Compatibility Preflight  ✅
+Docker Dev Runtime              ✅
+GitHub Actions CI               ✅
+Disposable DB Test Suite        ✅
+Doctor / Release Check Tools    ✅
 Git-safe Runtime Ignore Rules   ✅
 Comprehensive GitHub README     ✅
 ```
@@ -1210,3 +1223,128 @@ Comprehensive GitHub README     ✅
 ---
 
 **Deployment rule:** Core reusable، Modules extensible، Frontend independent، Secrets outside Git، وSchema changes append-only عبر migrations.
+
+
+# 26. U4: Docker / CI / Runtime Verification
+
+U4 ينقل المشروع من مرحلة **Reusable Starter** إلى مرحلة **Release Candidate قابل للتحقق آليًا**. الهدف ليس إضافة Business Features جديدة، بل إثبات أن التثبيت، الترقية، migrations، Module Generator، وBackup/Restore يمكن اختبارهم على بيئة disposable قبل لمس Production.
+
+## تشغيل محلي سريع بـDocker
+
+```bash
+cp .env.docker.example .env
+# غيّر كلمات المرور داخل .env
+docker compose up -d --build
+```
+
+ثم افتح:
+
+```text
+http://localhost:8080/install/
+```
+
+تفاصيل أكثر: [docs/DOCKER.md](docs/DOCKER.md).
+
+## فحص البيئة
+
+Static فقط:
+
+```bash
+php tools/doctor.php --static
+```
+
+على Runtime متصل بقاعدة البيانات:
+
+```bash
+php tools/doctor.php
+```
+
+الفحص يتحقق من PHP/extensions، الكتابة على storage/uploads، DB، migration drift/pending state، وModule manifests.
+
+## Release check
+
+```bash
+php tools/release-check.php
+```
+
+ويجمع verifier + static doctor + PHP syntax.
+
+## Runtime integration suite
+
+**ممنوع تشغيل destructive tests على Production.** الاختبارات نفسها ترفض العمل إلا إذا كان اسم قاعدة البيانات يحتوي `test` أو `ci`.
+
+```bash
+bash tests/integration/http-installer.sh
+php tests/integration/upgrade-v0_3.php
+php tests/integration/runtime.php
+php tests/integration/generator.php
+php tools/doctor.php
+```
+
+تثبت هذه السلسلة:
+
+- Installer من Database فارغة حتى Login.
+- API health/discovery.
+- Upgrade حقيقي من v0.3 schema إلى v0.4.
+- Migration checksum drift detection.
+- MariaDB data writes/reads.
+- Backup + Restore للـDB وuploads على Clone.
+- Pre-Restore Backup.
+- تعطيل Module بدون حذف جدولها.
+- توليد Module جديدة على نسخة disposable واكتشافها بدون تعديل Core.
+
+راجع [docs/RUNTIME_TESTING.md](docs/RUNTIME_TESTING.md).
+
+## Migration locking
+
+U4 يضيف MariaDB/MySQL advisory lock أثناء تطبيق migrations، والـlock مرتبط باسم Database حتى لا يمنع مشروع CMS آخر يستخدم نفس MySQL Server. الهدف منع تشغيل migrations متزامنة من عمليتي deploy/admin في نفس اللحظة.
+
+## Backup format v3
+
+النسخ الجديدة تحتوي Metadata إضافية:
+
+```text
+platform_version
+schema signature
+migration snapshot
+table data
+upload hashes + sizes
+```
+
+وقبل Restore يتم فحص:
+
+- سلامة envelope/hash.
+- upload hashes/paths.
+- وجود الجداول/الأعمدة المطلوبة.
+- عدم وجود Migration Drift.
+- عدم وجود عمود جديد Required لا تستطيع النسخة القديمة ملأه.
+
+U4 ما زال يقرأ Backup v2 من v0.3 للتوافق الخلفي.
+
+## GitHub Actions
+
+الملف:
+
+```text
+.github/workflows/ci.yml
+```
+
+يشغل:
+
+1. Static matrix على PHP 8.2 / 8.3 / 8.4.
+2. MariaDB 11.4 service.
+3. HTTP installer/login smoke.
+4. v0.3 → v0.4 upgrade test.
+5. DB + Backup/Restore runtime test.
+6. Module Generator test.
+7. Runtime Doctor.
+
+## قبل Tag أو Production Deploy
+
+استخدم:
+
+```text
+RELEASE_CHECKLIST.md
+```
+
+ولا تعتبر Release مقفولة حتى تكون CI خضراء ويكون Restore مجربًا على disposable clone.

@@ -106,39 +106,70 @@ function cmsMigrationStatus(PDO $pdo, string $scope, string $directory): array
     ];
 }
 
+function cmsAcquireMigrationLock(PDO $pdo, int $timeoutSeconds = 15): void
+{
+    $database = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+    $lockName = 'ucms_mig_' . substr(hash('sha256', $database), 0, 32);
+    $stmt = $pdo->prepare('SELECT GET_LOCK(:lock_name, :timeout)');
+    $stmt->bindValue(':lock_name', $lockName, PDO::PARAM_STR);
+    $stmt->bindValue(':timeout', $timeoutSeconds, PDO::PARAM_INT);
+    $stmt->execute();
+    if ((int)$stmt->fetchColumn() !== 1) {
+        throw new RuntimeException('MIGRATION_LOCK_TIMEOUT');
+    }
+}
+
+function cmsReleaseMigrationLock(PDO $pdo): void
+{
+    try {
+        $database = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+        $lockName = 'ucms_mig_' . substr(hash('sha256', $database), 0, 32);
+        $stmt = $pdo->prepare('SELECT RELEASE_LOCK(:lock_name)');
+        $stmt->execute([':lock_name' => $lockName]);
+    } catch (Throwable $ignored) {}
+}
+
 function cmsRunMigrations(PDO $pdo, string $scope, string $directory): array
 {
-    cmsEnsureMigrationTable($pdo);
-    $applied = cmsAppliedMigrations($pdo, $scope);
-    $executed = [];
+    cmsAcquireMigrationLock($pdo);
+    try {
+        cmsEnsureMigrationTable($pdo);
+        $applied = cmsAppliedMigrations($pdo, $scope);
+        $executed = [];
 
-    foreach (cmsMigrationFiles($directory) as $path) {
-        $key = basename($path);
-        $raw = file_get_contents($path);
-        if ($raw === false) {
-            throw new RuntimeException('Cannot read migration: ' . $path);
-        }
-        $normalized = cmsMigrationNormalizedContent($raw);
-        $checksum = hash('sha256', $normalized);
-
-        if (isset($applied[$key])) {
-            if (!hash_equals($applied[$key]['checksum'], $checksum)) {
-                throw new RuntimeException('MIGRATION_CHECKSUM_MISMATCH: ' . $scope . '/' . $key);
+        foreach (cmsMigrationFiles($directory) as $path) {
+            $key = basename($path);
+            if (!preg_match('/^\d{3,}_[A-Za-z0-9_.-]+\.sql$/', $key)) {
+                throw new RuntimeException('INVALID_MIGRATION_FILENAME: ' . $scope . '/' . $key);
             }
-            continue;
+            $raw = file_get_contents($path);
+            if ($raw === false) {
+                throw new RuntimeException('Cannot read migration: ' . $path);
+            }
+            $normalized = cmsMigrationNormalizedContent($raw);
+            $checksum = hash('sha256', $normalized);
+
+            if (isset($applied[$key])) {
+                if (!hash_equals($applied[$key]['checksum'], $checksum)) {
+                    throw new RuntimeException('MIGRATION_CHECKSUM_MISMATCH: ' . $scope . '/' . $key);
+                }
+                continue;
+            }
+
+            foreach (cmsMigrationStatements($normalized) as $statement) {
+                $pdo->exec($statement);
+            }
+
+            $stmt = $pdo->prepare('INSERT INTO cms_schema_migrations(scope_key,migration_key,checksum) VALUES(:scope,:key,:checksum)');
+            $stmt->execute([':scope' => $scope, ':key' => $key, ':checksum' => $checksum]);
+            $executed[] = $key;
+            $applied[$key] = ['checksum' => $checksum, 'applied_at' => date('Y-m-d H:i:s')];
         }
 
-        foreach (cmsMigrationStatements($normalized) as $statement) {
-            $pdo->exec($statement);
-        }
-
-        $stmt = $pdo->prepare('INSERT INTO cms_schema_migrations(scope_key,migration_key,checksum) VALUES(:scope,:key,:checksum)');
-        $stmt->execute([':scope' => $scope, ':key' => $key, ':checksum' => $checksum]);
-        $executed[] = $key;
-        $applied[$key] = ['checksum' => $checksum, 'applied_at' => date('Y-m-d H:i:s')];
+        return $executed;
+    } finally {
+        cmsReleaseMigrationLock($pdo);
     }
-
-    return $executed;
 }
 
 function cmsRunCoreMigrations(PDO $pdo): array
