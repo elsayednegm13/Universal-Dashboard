@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1);require_once __DIR__.'/../../includes/api.php';cmsApiBootstrap();require_once __DIR__.'/../../includes/helpers.php';require_once __DIR__.'/../../includes/module-registry.php';$pdo=cmsPdo();if(!cmsModuleEnabled($pdo,'media'))cmsJson(['ok'=>false,'error'=>'MODULE_DISABLED'],404);$rows=$pdo->query('SELECT id,file_path,original_name,mime_type,title_ar,title_en,alt_ar,alt_en,created_at FROM media_items WHERE is_public=1 ORDER BY id DESC LIMIT 500')->fetchAll();cmsJson(['ok'=>true,'data'=>$rows]);

@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS site_content (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  content_key VARCHAR(160) NOT NULL UNIQUE,
+  group_key VARCHAR(100) NOT NULL DEFAULT 'general',
+  label VARCHAR(190) NOT NULL,
+  value_ar LONGTEXT NULL,
+  value_en LONGTEXT NULL,
+  input_type ENUM('text','textarea','html') NOT NULL DEFAULT 'text',
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_content_group_order (group_key,sort_order,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,25 @@
+# Runtime secrets / installation state
+/storage/config.local.php
+/storage/install.lock
+
+# Runtime backups
+/storage/backups/*
+!/storage/backups/.gitkeep
+
+# User uploads (keep protection files)
+/uploads/*
+!/uploads/.htaccess
+!/uploads/.gitkeep
+
+# Local/editor/system files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+
+# Local verification artifacts
+/.phpunit.result.cache
+/coverage/

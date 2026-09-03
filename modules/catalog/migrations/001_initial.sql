@@ -1,0 +1,52 @@
+CREATE TABLE IF NOT EXISTS catalog_brands (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(190) NOT NULL UNIQUE,
+  name_ar VARCHAR(255) NOT NULL,
+  name_en VARCHAR(255) NOT NULL,
+  description_ar TEXT NULL,
+  description_en TEXT NULL,
+  logo_path VARCHAR(500) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_brand_active_order(is_active,sort_order,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS catalog_categories (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(190) NOT NULL UNIQUE,
+  name_ar VARCHAR(255) NOT NULL,
+  name_en VARCHAR(255) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_category_active_order(is_active,sort_order,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS catalog_products (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  brand_id BIGINT UNSIGNED NULL,
+  category_id BIGINT UNSIGNED NULL,
+  slug VARCHAR(190) NOT NULL UNIQUE,
+  name_ar VARCHAR(255) NOT NULL,
+  name_en VARCHAR(255) NOT NULL,
+  description_ar TEXT NULL,
+  description_en TEXT NULL,
+  image_path VARCHAR(500) NULL,
+  sku VARCHAR(120) NULL,
+  price DECIMAL(14,2) NULL,
+  currency VARCHAR(12) NULL,
+  availability ENUM('available','unavailable','coming_soon') NOT NULL DEFAULT 'available',
+  is_featured TINYINT(1) NOT NULL DEFAULT 0,
+  is_new TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  deleted_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_product_public(deleted_at,is_active,sort_order,id),
+  INDEX idx_product_brand(brand_id),
+  INDEX idx_product_category(category_id),
+  CONSTRAINT fk_catalog_product_brand FOREIGN KEY (brand_id) REFERENCES catalog_brands(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_catalog_product_category FOREIGN KEY (category_id) REFERENCES catalog_categories(id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

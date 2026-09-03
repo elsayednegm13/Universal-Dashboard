@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1);require_once __DIR__.'/../../includes/api.php';cmsApiBootstrap();require_once __DIR__.'/../../includes/helpers.php';require_once __DIR__.'/../../includes/module-registry.php';$pdo=cmsPdo();if(!cmsModuleEnabled($pdo,'content'))cmsJson(['ok'=>false,'error'=>'MODULE_DISABLED'],404);$rows=$pdo->query('SELECT content_key,group_key,label,value_ar,value_en,input_type,sort_order FROM site_content WHERE is_active=1 ORDER BY group_key,sort_order,id')->fetchAll();cmsJson(['ok'=>true,'data'=>$rows]);

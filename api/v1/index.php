@@ -1,0 +1,3 @@
+<?php
+
+declare(strict_types=1);require_once __DIR__.'/../../includes/api.php';cmsApiBootstrap();require_once __DIR__.'/../../includes/database.php';require_once __DIR__.'/../../includes/module-registry.php';require_once __DIR__.'/../../includes/version.php';$pdo=cmsPdo();$states=cmsModuleStates($pdo);$routes=['site'=>'/api/v1/site.php','health'=>'/api/v1/health.php'];foreach(cmsAvailableModules() as $k=>$m)if(($states[$k]??false)&&!empty($m['api']))$routes[$k]=$m['api'];echo json_encode(['ok'=>true,'version'=>UNIVERSAL_CMS_VERSION,'api_version'=>'v1','routes'=>$routes],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
